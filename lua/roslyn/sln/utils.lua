@@ -71,6 +71,7 @@ local ignored_dirs = {
     "obj",
     "bin",
     ".git",
+    ".config",
 }
 
 function M.find_solutions_broad(bufnr)

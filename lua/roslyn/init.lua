@@ -10,7 +10,7 @@ function M.setup(config)
 
     require("roslyn.config").setup(config)
 
-    vim.lsp.enable("roslyn")
+    --vim.lsp.enable("roslyn")
 
     vim.api.nvim_create_autocmd("FileType", {
         group = group,
@@ -20,7 +20,7 @@ function M.setup(config)
         end,
     })
 
-    vim.treesitter.language.register("c_sharp", "csharp")
+    --vim.treesitter.language.register("c_sharp", "csharp")
 
     vim.api.nvim_create_autocmd({ "BufReadCmd" }, {
         group = group,

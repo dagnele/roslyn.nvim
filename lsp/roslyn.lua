@@ -36,68 +36,38 @@ return {
         },
     },
     root_dir = function(bufnr, on_dir)
-        local buf_name = vim.api.nvim_buf_get_name(bufnr)
-
-        -- For source-generated files, use the root_dir from the existing client
-        if buf_name:match("^roslyn%-source%-generated://") then
+        local root_dir = vim.fs.root(bufnr, ".git")
+        if root_dir == nil then
+            -- NOTE: Cannot find the root of the project, fallback to the existing client's root_dir
             local existing_client = vim.lsp.get_clients({ name = "roslyn" })[1]
             if existing_client and existing_client.config.root_dir then
-                require("roslyn.log").log(
-                    string.format("lsp root_dir for source-generated file: %s", existing_client.config.root_dir)
-                )
                 on_dir(existing_client.config.root_dir)
                 return
             end
         end
 
-        local utils = require("roslyn.sln.utils")
-        local config = require("roslyn.config")
-        local solutions = config.get().broad_search and utils.find_solutions_broad(bufnr) or utils.find_solutions(bufnr)
-        local root_dir = utils.root_dir(bufnr, solutions, vim.g.roslyn_nvim_selected_solution)
-        require("roslyn.log").log(string.format("lsp root_dir is: %s", root_dir))
         on_dir(root_dir)
     end,
     on_init = {
         function(client)
-            if not client.config.root_dir then
+            local solution = vim.g.roslyn_nvim_selected_solution
+            if solution == nil or solution == "" then
+                vim.notify("No solution selected, please run :Roslyn target", vim.log.levels.INFO, {
+                    title = "roslyn.nvim",
+                })
                 return
             end
-            require("roslyn.log").log(string.format("lsp on_init root_dir: %s", client.config.root_dir))
 
-            local utils = require("roslyn.sln.utils")
-            local on_init = require("roslyn.lsp.on_init")
+            client:notify("solution/open", {
+                solution = vim.uri_from_fname(solution),
+            })
 
-            local config = require("roslyn.config").get()
-            local selected_solution = vim.g.roslyn_nvim_selected_solution
-            if config.lock_target and selected_solution then
-                return on_init.sln(client, selected_solution)
-            end
-
-            local files = utils.find_files_with_extensions(client.config.root_dir, { ".sln", ".slnx", ".slnf" })
-
-            local bufnr = vim.api.nvim_get_current_buf()
-            local solution = utils.predict_target(bufnr, files)
-            if solution then
-                return on_init.sln(client, solution)
-            end
-
-            local csproj = utils.find_files_with_extensions(client.config.root_dir, { ".csproj" })
-            if #csproj > 0 then
-                return on_init.project(client, csproj)
-            end
-
-            if selected_solution then
-                return on_init.sln(client, selected_solution)
-            end
+            vim.notify("Initializing Roslyn for: " .. solution, vim.log.levels.INFO, { title = "roslyn.nvim" })
         end,
     },
     on_exit = {
         function()
-            vim.g.roslyn_nvim_selected_solution = nil
-            vim.schedule(function()
-                require("roslyn.roslyn_emitter"):emit("stopped")
-                vim.notify("Roslyn server stopped", vim.log.levels.INFO, { title = "roslyn.nvim" })
-            end)
+            vim.notify("Roslyn server stopped", vim.log.levels.INFO, { title = "roslyn.nvim" })
         end,
     },
     commands = require("roslyn.lsp.commands"),
